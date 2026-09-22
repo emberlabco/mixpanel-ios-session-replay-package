@@ -33,6 +33,10 @@ class ScreenRecorder {
     /// the current wireframe elements alongside each screenshot capture.
     var wireframeEmitter: WireframeEmitter?
 
+    /// How each frame is rendered; mirrored from `MPSessionReplayConfig.captureMethod`
+    /// by the instance that owns the recording.
+    var captureMethod: MPCaptureMethod = .viewHierarchy
+
     var mainScreenRendererFormat: UIGraphicsImageRendererFormat
     var presentedScreenRendererFormat: UIGraphicsImageRendererFormat
 
@@ -197,7 +201,18 @@ class ScreenRecorder {
             sensitiveFrames = frames
             wireframes = elements
 
-            view.drawHierarchy(in: viewBounds, afterScreenUpdates: false)
+            switch captureMethod {
+                case .viewHierarchy:
+                    view.drawHierarchy(in: viewBounds, afterScreenUpdates: false)
+                case .layerTree:
+                    // `render(in:)` draws at the layer's own origin, so the context is
+                    // moved to where the view sits in the window first — the same
+                    // placement `drawHierarchy(in:)` gives the snapshot.
+                    context.cgContext.saveGState()
+                    context.cgContext.translateBy(x: viewBounds.origin.x, y: viewBounds.origin.y)
+                    view.layer.render(in: context.cgContext)
+                    context.cgContext.restoreGState()
+            }
 
             // Apply masking to sensitive frames with LIGHT GRAY
             context.cgContext.setFillColor(UIColor.lightGray.cgColor)

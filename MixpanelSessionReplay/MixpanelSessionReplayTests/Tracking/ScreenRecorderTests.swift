@@ -21,6 +21,7 @@ class ScreenRecorderTests: XCTestCase {
     }
 
     override func tearDown() {
+        recorder.captureMethod = .viewHierarchy
         recorder = nil
         mockWindow = nil
         super.tearDown()
@@ -152,6 +153,45 @@ class ScreenRecorderTests: XCTestCase {
         window.isHidden = false
         let image = recorder.renderViewHierarchyAsImage(window: window)
         XCTAssertNotNil(image, "Should return an image if view is visible")
+    }
+
+    /// The layer-tree method draws the app's own content into the frame — a solid red
+    /// root view here, sampled at the frame's center. (`drawHierarchy` needs the window
+    /// to have been composited on screen, which a test window never is, so the view-
+    /// hierarchy method is only checked for producing an image, above.)
+    func testRenderViewHierarchyAsImage_LayerTreeRendersTheWindowContent() throws {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 200, height: 300))
+        let rootVC = UIViewController()
+        rootVC.view.backgroundColor = .red
+        window.rootViewController = rootVC
+        window.isHidden = false
+        window.layoutIfNeeded()
+        recorder.captureMethod = .layerTree
+
+        let frame = try XCTUnwrap(recorder.renderViewHierarchyAsImage(window: window))
+        let center = CGPoint(x: frame.image.size.width / 2, y: frame.image.size.height / 2)
+        let color = try XCTUnwrap(pixel(of: frame.image, at: center))
+
+        XCTAssertEqual(color.red, 255, accuracy: 2, "should render the red root view")
+        XCTAssertEqual(color.green, 0, accuracy: 2, "should render the red root view")
+        XCTAssertEqual(color.blue, 0, accuracy: 2, "should render the red root view")
+    }
+
+    private func pixel(of image: UIImage, at point: CGPoint) -> (red: Double, green: Double, blue: Double)? {
+        guard let cgImage = image.cgImage else { return nil }
+        var rgba = [UInt8](repeating: 0, count: 4)
+        guard
+            let context = CGContext(
+                data: &rgba, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.draw(
+            cgImage,
+            in: CGRect(
+                x: -point.x * image.scale, y: -point.y * image.scale,
+                width: CGFloat(cgImage.width), height: CGFloat(cgImage.height)))
+        return (Double(rgba[0]), Double(rgba[1]), Double(rgba[2]))
     }
 
     // MARK: - getTopViewFor (with isPresented flag)

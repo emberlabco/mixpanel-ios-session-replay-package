@@ -368,4 +368,58 @@ class MPSessionReplayConfigTests: XCTestCase {
         let decodedConfigFallback = try MPSessionReplayConfig.from(json: jsonDataFallback)
         XCTAssertEqual(decodedConfigFallback.remoteSettingsMode, .fallback)
     }
+
+    // MARK: - Capture Options
+
+    func testCaptureOptionsDefaults() {
+        let config = MPSessionReplayConfig()
+
+        XCTAssertEqual(config.captureMethod, .viewHierarchy, "Default captureMethod should be viewHierarchy")
+        XCTAssertTrue(config.capturesFrameOnTouchDown, "Default capturesFrameOnTouchDown should be true")
+    }
+
+    func testCaptureOptionsCustomInitialization() {
+        let config = MPSessionReplayConfig(captureMethod: .layerTree, capturesFrameOnTouchDown: false)
+
+        XCTAssertEqual(config.captureMethod, .layerTree)
+        XCTAssertFalse(config.capturesFrameOnTouchDown)
+    }
+
+    func testCaptureOptionsEncodingAndDecoding() throws {
+        let originalConfig = MPSessionReplayConfig(captureMethod: .layerTree, capturesFrameOnTouchDown: false)
+
+        let jsonData = try originalConfig.toJSON()
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: jsonData) as? [String: Any])
+        XCTAssertEqual(json["captureMethod"] as? String, "layerTree")
+        XCTAssertEqual(json["capturesFrameOnTouchDown"] as? Bool, false)
+
+        let decodedConfig = try MPSessionReplayConfig.from(json: jsonData)
+        XCTAssertEqual(decodedConfig.captureMethod, .layerTree)
+        XCTAssertFalse(decodedConfig.capturesFrameOnTouchDown)
+    }
+
+    func testDecodingWithoutCaptureOptionsUsesTheirDefaults() throws {
+        // A config JSON written before these options existed must keep decoding.
+        let jsonString = """
+            {
+                "wifiOnly": true,
+                "recordingSessionsPercent": 100.0,
+                "autoMaskedViews": ["image", "text"],
+                "autoStartRecording": true,
+                "remoteSettingsMode": "disabled",
+                "enableLogging": false,
+                "flushInterval": 10.0,
+                "enableSessionReplayOniOS26AndLater": false,
+                "serverURL": "https://api.mixpanel.com"
+            }
+            """
+        let jsonData = jsonString.data(using: .utf8)!
+        let decodedConfig = try MPSessionReplayConfig.from(json: jsonData)
+
+        XCTAssertEqual(decodedConfig.captureMethod, .viewHierarchy)
+        XCTAssertTrue(decodedConfig.capturesFrameOnTouchDown)
+        // The keys that were there are still honored.
+        XCTAssertTrue(decodedConfig.wifiOnly)
+        XCTAssertEqual(decodedConfig.autoMaskedViews, [.image, .text])
+    }
 }

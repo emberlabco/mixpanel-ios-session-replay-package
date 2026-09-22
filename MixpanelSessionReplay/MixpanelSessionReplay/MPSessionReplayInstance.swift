@@ -62,6 +62,9 @@ open class MPSessionReplayInstance: MPSessionReplaying {
         // Wire up wireframes if opted in. `wireframesOptions` is the single
         // switch that turns capture on; `debugOptions.wireframeEmitter` only
         // observes it, so passing it without wireframes options is a no-op.
+        ScreenRecorder.shared.captureMethod = config.captureMethod
+        TouchEventTracker.capturesFrameOnTouchDown = config.capturesFrameOnTouchDown
+
         if let wireframesOptions = config.wireframesOptions {
             ScreenRecorder.shared.wireframeEmitter = WireframeEmitter(
                 options: wireframesOptions,
@@ -164,6 +167,8 @@ open class MPSessionReplayInstance: MPSessionReplaying {
         // included — goes with `SensitiveViewManager.reset()` a few lines later in
         // `deinitializeInstance`, the sole caller of this method.
         ScreenRecorder.shared.wireframeEmitter = nil
+        ScreenRecorder.shared.captureMethod = .viewHierarchy
+        TouchEventTracker.capturesFrameOnTouchDown = true
     }
 
     @objc func appDidEnterBackground() {

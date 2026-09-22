@@ -36,6 +36,11 @@ struct TouchEventData {
 /// `UIEvent` arrived.
 struct TouchEventTracker {
     /// Identifies the one pointer we follow. `nil` means no gesture is in flight.
+    /// Whether `gestureBegan` captures a frame; mirrored from
+    /// `MPSessionReplayConfig.capturesFrameOnTouchDown` by the instance that owns the
+    /// recording. The touch-up frame in `gestureEnded` is captured either way.
+    static var capturesFrameOnTouchDown = true
+
     private static var primaryTouchHash: Int?
     private static var pendingSamples: [TouchSample] = []
     private static var lastSampledTimestamp: Int64 = 0
@@ -108,7 +113,9 @@ struct TouchEventTracker {
 
         MPSessionReplay.getInstance()?.debugMaskOverlayManager?.enableTransitioningState()
         publishInteraction(MouseInteraction.touchStart, touch)
-        MPSessionReplay.getInstance()?.record(touch.timestamp)
+        if capturesFrameOnTouchDown {
+            Swizzler.shared.sessionReplay?.record(touch.timestamp)
+        }
     }
 
     private static func gestureMoved(_ touch: TouchEventData) {
@@ -138,7 +145,7 @@ struct TouchEventTracker {
         flushSamples()
         publishInteraction(interaction, touch)
         resetGesture()
-        MPSessionReplay.getInstance()?.record(touch.timestamp)
+        Swizzler.shared.sessionReplay?.record(touch.timestamp)
     }
 
     private static func flushSamples() {

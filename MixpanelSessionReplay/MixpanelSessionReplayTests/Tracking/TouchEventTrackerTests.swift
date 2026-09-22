@@ -36,19 +36,28 @@ final class TouchEventTrackerTests: BaseTests {
 
     private var listener: CapturingTouchListener!
 
+    private var replay: MockMPSessionReplay!
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         TouchEventTracker.resetGesture()
+        TouchEventTracker.capturesFrameOnTouchDown = true
         listener = CapturingTouchListener()
         EventPublisher.shared.subscribe(listener)
+        replay = MockMPSessionReplay()
+        replay.isRecording = true
+        Swizzler.shared.testOverride_sessionReplay = replay
         drainPublisher()
     }
 
     override func tearDownWithError() throws {
+        Swizzler.shared.testOverride_sessionReplay = nil
+        replay = nil
         EventPublisher.shared.unsubscribe(listener)
         drainPublisher()
         listener = nil
         TouchEventTracker.resetGesture()
+        TouchEventTracker.capturesFrameOnTouchDown = true
         try super.tearDownWithError()
     }
 
@@ -276,5 +285,28 @@ final class TouchEventTrackerTests: BaseTests {
         guard case .move(let samples) = listener.events[1] else { return XCTFail("expected a batch") }
         XCTAssertEqual(listener.events[1].timestamp, samples.last?.timestamp)
         XCTAssertEqual(listener.events[1].timestamp, 1_120)
+    }
+
+    // MARK: - Frame capture
+
+    func testTouchDown_capturesAFrameByDefault() {
+        send(touch(.began, at: 1_000))
+
+        XCTAssertTrue(replay.recordCalled)
+        XCTAssertEqual(replay.lastRecordTimestamp, 1_000)
+    }
+
+    func testTouchDown_capturesNoFrameWhenDisabled_touchUpStillDoes() {
+        TouchEventTracker.capturesFrameOnTouchDown = false
+
+        send(touch(.began, at: 1_000))
+        XCTAssertFalse(replay.recordCalled, "no frame on touch-down when the option is off")
+        // The touch-down marker is still recorded.
+        XCTAssertEqual(interactionTypes, [MouseInteraction.touchStart])
+
+        send(touch(.ended, at: 1_100))
+        XCTAssertTrue(replay.recordCalled, "touch-up still captures a frame")
+        XCTAssertEqual(replay.lastRecordTimestamp, 1_100)
+        XCTAssertEqual(interactionTypes, [MouseInteraction.touchStart, MouseInteraction.touchEnd])
     }
 }
