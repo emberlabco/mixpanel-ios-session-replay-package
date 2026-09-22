@@ -108,7 +108,9 @@ struct TouchEventTracker {
 
         MPSessionReplay.getInstance()?.debugMaskOverlayManager?.enableTransitioningState()
         publishInteraction(MouseInteraction.touchStart, touch)
-        MPSessionReplay.getInstance()?.record(touch.timestamp)
+        // No frame on touch-down: the screen has not changed yet, and a
+        // capture here lands exactly when the press feedback should render.
+        // The touch-up capture in `gestureEnded` shows what the tap did.
     }
 
     private static func gestureMoved(_ touch: TouchEventData) {

@@ -197,7 +197,18 @@ class ScreenRecorder {
             sensitiveFrames = frames
             wireframes = elements
 
-            view.drawHierarchy(in: viewBounds, afterScreenUpdates: false)
+            // Render the layer tree rather than snapshot the view hierarchy.
+            // `drawHierarchy(in:afterScreenUpdates:)` re-renders the window
+            // through the render server and costs ~74 ms of main thread per
+            // frame on an iPhone 14 running iOS 26+ (~9 ms on iOS 18);
+            // `CALayer.render(in:)` draws the same tree directly and costs
+            // ~20 ms. The trade: layers the app does not draw itself —
+            // AVPlayerLayer video, system visual effects — render empty, and
+            // in-flight animations render at their target values.
+            context.cgContext.saveGState()
+            context.cgContext.translateBy(x: viewBounds.origin.x, y: viewBounds.origin.y)
+            view.layer.render(in: context.cgContext)
+            context.cgContext.restoreGState()
 
             // Apply masking to sensitive frames with LIGHT GRAY
             context.cgContext.setFillColor(UIColor.lightGray.cgColor)
