@@ -201,18 +201,7 @@ class ScreenRecorder {
             sensitiveFrames = frames
             wireframes = elements
 
-            switch captureMethod {
-                case .viewHierarchy:
-                    view.drawHierarchy(in: viewBounds, afterScreenUpdates: false)
-                case .layerTree:
-                    // `render(in:)` draws at the layer's own origin, so the context is
-                    // moved to where the view sits in the window first — the same
-                    // placement `drawHierarchy(in:)` gives the snapshot.
-                    context.cgContext.saveGState()
-                    context.cgContext.translateBy(x: viewBounds.origin.x, y: viewBounds.origin.y)
-                    view.layer.render(in: context.cgContext)
-                    context.cgContext.restoreGState()
-            }
+            draw(view, at: viewBounds, in: context.cgContext)
 
             // Apply masking to sensitive frames with LIGHT GRAY
             context.cgContext.setFillColor(UIColor.lightGray.cgColor)
@@ -240,6 +229,23 @@ class ScreenRecorder {
         }
 
         return RenderedFrame(image: image, capturedAtMs: capturedAtMs)
+    }
+
+    /// Draws `view` into `cgContext` at `viewBounds` — its frame in window coordinates —
+    /// with the configured capture method.
+    func draw(_ view: UIView, at viewBounds: CGRect, in cgContext: CGContext) {
+        switch captureMethod {
+            case .viewHierarchy:
+                view.drawHierarchy(in: viewBounds, afterScreenUpdates: false)
+            case .layerTree:
+                // `render(in:)` draws at the layer's own origin, so the context is moved
+                // to where the view sits in the window first — the same placement
+                // `drawHierarchy(in:)` gives the snapshot.
+                cgContext.saveGState()
+                cgContext.translateBy(x: viewBounds.origin.x, y: viewBounds.origin.y)
+                view.layer.render(in: cgContext)
+                cgContext.restoreGState()
+        }
     }
 
     /// Renders and compresses the current window, carrying the frame's capture instant

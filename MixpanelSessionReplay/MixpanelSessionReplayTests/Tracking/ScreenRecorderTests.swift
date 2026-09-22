@@ -177,6 +177,40 @@ class ScreenRecorderTests: XCTestCase {
         XCTAssertEqual(color.blue, 0, accuracy: 2, "should render the red root view")
     }
 
+    /// The layer-tree method must place the view where it sits in the window, not at the
+    /// context's origin: a view drawn at a non-zero `viewBounds.origin` lands inside that
+    /// rect, and the spot it would have covered without the translation stays untouched.
+    func testDraw_LayerTreePlacesTheViewAtItsWindowPosition() throws {
+        let view = UIView(frame: CGRect(x: 0, y: 0, width: 50, height: 50))
+        view.backgroundColor = .red
+        view.layoutIfNeeded()
+        let viewBounds = CGRect(x: 40, y: 60, width: 50, height: 50)
+        recorder.captureMethod = .layerTree
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let size = CGSize(width: 200, height: 300)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            context.cgContext.setFillColor(UIColor.white.cgColor)
+            context.cgContext.fill(CGRect(origin: .zero, size: size))
+            recorder.draw(view, at: viewBounds, in: context.cgContext)
+        }
+
+        let inside = try XCTUnwrap(pixel(of: image, at: CGPoint(x: 65, y: 85)))
+        XCTAssertEqual(inside.red, 255, accuracy: 2, "the view should be drawn inside viewBounds")
+        XCTAssertEqual(inside.green, 0, accuracy: 2)
+        XCTAssertEqual(inside.blue, 0, accuracy: 2)
+
+        let untranslated = try XCTUnwrap(pixel(of: image, at: CGPoint(x: 25, y: 25)))
+        XCTAssertEqual(untranslated.green, 255, accuracy: 2, "where the view would land without the translation")
+        XCTAssertEqual(untranslated.blue, 255, accuracy: 2, "where the view would land without the translation")
+
+        let outside = try XCTUnwrap(pixel(of: image, at: CGPoint(x: 150, y: 250)))
+        XCTAssertEqual(outside.green, 255, accuracy: 2, "the rest of the frame stays untouched")
+        XCTAssertEqual(outside.blue, 255, accuracy: 2, "the rest of the frame stays untouched")
+    }
+
     private func pixel(of image: UIImage, at point: CGPoint) -> (red: Double, green: Double, blue: Double)? {
         guard let cgImage = image.cgImage else { return nil }
         var rgba = [UInt8](repeating: 0, count: 4)
@@ -186,11 +220,15 @@ class ScreenRecorderTests: XCTestCase {
                 space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { return nil }
+        // `point` is in top-left image coordinates; the bitmap context's origin is
+        // bottom-left, so the image is placed so that row `point.y` from the top lands
+        // on the context's one pixel.
+        let height = CGFloat(cgImage.height)
         context.draw(
             cgImage,
             in: CGRect(
-                x: -point.x * image.scale, y: -point.y * image.scale,
-                width: CGFloat(cgImage.width), height: CGFloat(cgImage.height)))
+                x: -point.x * image.scale, y: -(height - point.y * image.scale),
+                width: CGFloat(cgImage.width), height: height))
         return (Double(rgba[0]), Double(rgba[1]), Double(rgba[2]))
     }
 

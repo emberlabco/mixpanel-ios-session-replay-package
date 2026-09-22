@@ -35,12 +35,12 @@ struct TouchEventData {
 /// ends, so no position is held behind a timer and every event carries the instant its
 /// `UIEvent` arrived.
 struct TouchEventTracker {
-    /// Identifies the one pointer we follow. `nil` means no gesture is in flight.
     /// Whether `gestureBegan` captures a frame; mirrored from
     /// `MPSessionReplayConfig.capturesFrameOnTouchDown` by the instance that owns the
     /// recording. The touch-up frame in `gestureEnded` is captured either way.
     static var capturesFrameOnTouchDown = true
 
+    /// Identifies the one pointer we follow. `nil` means no gesture is in flight.
     private static var primaryTouchHash: Int?
     private static var pendingSamples: [TouchSample] = []
     private static var lastSampledTimestamp: Int64 = 0
